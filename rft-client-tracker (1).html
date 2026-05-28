@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RFT Client Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --charcoal: #3D3228;
+    --deep-terra: #B85C38;
+    --soft-terra: #C97D5E;
+    --linen: #CFC0AC;
+    --cream: #F5EFE4;
+    --white: #FFFFFF;
+    --danger: #c0392b;
+    --success: #2e7d52;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--charcoal); min-height: 100vh; }
+
+  header {
+    background: var(--charcoal);
+    padding: 18px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px rgba(61,50,40,0.35);
+  }
+  header h1 { font-family: 'Playfair Display', serif; color: var(--cream); font-size: 1.45rem; }
+  header h1 span { color: var(--soft-terra); }
+  .header-right { display: flex; align-items: center; gap: 18px; }
+  .header-stats { display: flex; gap: 22px; }
+  .header-stat { text-align: center; }
+  .header-stat .num { font-size: 1.3rem; font-weight: 700; color: var(--soft-terra); display: block; line-height: 1; }
+  .header-stat .lbl { font-size: 0.63rem; color: var(--linen); text-transform: uppercase; letter-spacing: 1px; }
+  .btn-settings {
+    background: rgba(207,192,172,0.15); border: none; border-radius: 8px;
+    color: var(--linen); cursor: pointer; padding: 8px 14px;
+    font-size: 0.8rem; font-family: 'DM Sans', sans-serif; font-weight: 500;
+    display: flex; align-items: center; gap: 6px; transition: all 0.2s;
+  }
+  .btn-settings:hover { background: rgba(207,192,172,0.3); color: var(--cream); }
+
+  .sync-badge {
+    font-size: 0.72rem; display: flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 20px; font-weight: 500; white-space: nowrap;
+  }
+  .sync-ok    { background: rgba(46,125,82,0.2);   color: #4caf7d; }
+  .sync-err   { background: rgba(192,57,43,0.2);   color: #e57373; }
+  .sync-local { background: rgba(207,192,172,0.18); color: var(--linen); }
+  .sync-busy  { background: rgba(201,125,94,0.2);  color: var(--soft-terra); }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin-icon { display: inline-block; animation: spin 0.9s linear infinite; }
+
+  .tab-bar {
+    background: var(--charcoal); padding: 0 32px;
+    display: flex; gap: 2px; overflow-x: auto;
+    border-top: 1px solid rgba(207,192,172,0.12);
+  }
+  .tab-bar::-webkit-scrollbar { height: 3px; }
+  .tab-bar::-webkit-scrollbar-thumb { background: var(--soft-terra); }
+  .tab-btn {
+    background: none; border: none; color: var(--linen);
+    font-family: 'DM Sans', sans-serif; font-size: 0.77rem; font-weight: 500;
+    padding: 11px 16px; cursor: pointer; white-space: nowrap;
+    border-bottom: 3px solid transparent; transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px; opacity: 0.7;
+  }
+  .tab-btn:hover { opacity: 1; color: var(--cream); }
+  .tab-btn.active { color: var(--soft-terra); border-bottom-color: var(--soft-terra); opacity: 1; }
+  .tab-badge { background: rgba(201,125,94,0.22); color: var(--soft-terra); border-radius: 10px; font-size: 0.67rem; padding: 1px 7px; font-weight: 600; }
+  .tab-btn.active .tab-badge { background: var(--soft-terra); color: var(--white); }
+
+  .main { padding: 24px 32px; max-width: 1440px; margin: 0 auto; }
+
+  .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; }
+  .search-wrap input {
+    width: 100%; padding: 9px 14px 9px 38px;
+    border: 1.5px solid var(--linen); border-radius: 8px;
+    background: var(--white); font-family: 'DM Sans', sans-serif;
+    font-size: 0.87rem; color: var(--charcoal); outline: none; transition: border-color 0.2s;
+  }
+  .search-wrap input:focus { border-color: var(--deep-terra); }
+  .search-ico { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--linen); }
+  .filter-select {
+    padding: 9px 13px; border: 1.5px solid var(--linen); border-radius: 8px;
+    background: var(--white); font-family: 'DM Sans', sans-serif;
+    font-size: 0.87rem; color: var(--charcoal); outline: none; cursor: pointer;
+  }
+  .btn-print {
+    background: rgba(61,50,40,0.07); color: var(--charcoal);
+    border: 1.5px solid var(--linen); padding: 9px 16px; border-radius: 8px;
+    font-family: 'DM Sans', sans-serif; font-size: 0.87rem; font-weight: 500;
+    cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;
+  }
+  .btn-print:hover { background: var(--charcoal); color: var(--cream); border-color: var(--charcoal); }
+  .btn-add {
+    background: var(--deep-terra); color: var(--white); border: none;
+    padding: 9px 18px; border-radius: 8px; font-family: 'DM Sans', sans-serif;
+    font-size: 0.87rem; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; transition: background 0.2s;
+  }
+  .btn-add:hover { background: var(--soft-terra); }
+
+  .table-wrap { background: var(--white); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 16px rgba(61,50,40,0.08); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  thead th {
+    background: var(--charcoal); color: var(--linen);
+    font-weight: 500; font-size: 0.71rem; text-transform: uppercase; letter-spacing: 0.8px;
+    padding: 12px 14px; text-align: left; white-space: nowrap;
+  }
+  thead th:last-child { text-align: right; }
+  tbody tr { border-bottom: 1px solid rgba(207,192,172,0.28); transition: background 0.15s; }
+  tbody tr:hover { background: rgba(245,239,228,0.5); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr.row-suspended { background: rgba(184,92,56,0.13); border-bottom-color: rgba(184,92,56,0.22); }
+  tbody tr.row-suspended:hover { background: rgba(184,92,56,0.21); }
+  tbody tr.row-suspended .client-name { color: var(--deep-terra); font-weight: 700; }
+  tbody tr.row-suspended .client-contact { color: rgba(184,92,56,0.65); }
+  td { padding: 11px 14px; vertical-align: middle; }
+  td:last-child { text-align: right; }
+  .client-name { font-weight: 600; }
+  .client-contact { font-size: 0.77rem; color: #7a6a5a; margin-top: 2px; }
+
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 0.71rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+  .badge-member    { background: rgba(184,92,56,0.12);  color: var(--deep-terra); }
+  .badge-pt        { background: rgba(61,50,40,0.1);    color: var(--charcoal); }
+  .badge-sgpt      { background: rgba(201,125,94,0.15); color: #a05a30; }
+  .badge-teen      { background: rgba(46,125,82,0.12);  color: #2e7d52; }
+  .badge-online    { background: rgba(41,98,255,0.1);   color: #2962ff; }
+  .badge-suspended { background: rgba(122,106,90,0.15); color: #7a6a5a; }
+  .badge-cancelled { background: rgba(153,153,153,0.15);color: #777; }
+
+  .cpill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 0.71rem; font-weight: 600; }
+  .con-on  { background: rgba(46,125,82,0.12); color: #2e7d52; }
+  .con-off { background: rgba(192,57,43,0.1);  color: var(--danger); }
+  .price-cell { font-weight: 600; }
+  .action-btns { display: flex; gap: 7px; justify-content: flex-end; }
+  .btn-e, .btn-d { border: none; border-radius: 6px; padding: 5px 11px; font-size: 0.77rem; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .btn-e { background: rgba(61,50,40,0.08); color: var(--charcoal); }
+  .btn-e:hover { background: var(--charcoal); color: var(--white); }
+  .btn-d { background: rgba(192,57,43,0.08); color: var(--danger); }
+  .btn-d:hover { background: var(--danger); color: var(--white); }
+  .empty-state { text-align: center; padding: 55px 20px; color: var(--linen); }
+  .empty-state p { font-size: 0.9rem; margin-top: 8px; }
+
+  /* OVERLAYS */
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(61,50,40,0.55); backdrop-filter: blur(3px);
+    z-index: 200; align-items: center; justify-content: center; padding: 20px;
+  }
+  .overlay.open { display: flex; }
+  .mbox {
+    background: var(--white); border-radius: 14px;
+    width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(61,50,40,0.28);
+    animation: su 0.22s ease;
+  }
+  @keyframes su { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .mhead {
+    padding: 22px 26px 15px; border-bottom: 1px solid rgba(207,192,172,0.35);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .mhead h2 { font-family: 'Playfair Display', serif; font-size: 1.2rem; }
+  .mclose { background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--linen); transition: color 0.15s; }
+  .mclose:hover { color: var(--charcoal); }
+  .mbody { padding: 22px 26px; }
+  .mfoot { padding: 14px 26px 22px; display: flex; gap: 9px; justify-content: flex-end; border-top: 1px solid rgba(207,192,172,0.35); }
+
+  .fg { display: flex; flex-direction: column; gap: 5px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .full { grid-column: 1/-1; }
+  label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; opacity: 0.65; }
+  input[type=text], input[type=email], input[type=tel], input[type=number], input[type=password], select {
+    padding: 9px 12px; border: 1.5px solid var(--linen); border-radius: 8px;
+    font-family: 'DM Sans', sans-serif; font-size: 0.89rem; color: var(--charcoal);
+    background: var(--white); outline: none; transition: border-color 0.2s;
+  }
+  input:focus, select:focus { border-color: var(--deep-terra); }
+  .btn-c { background: rgba(61,50,40,0.07); color: var(--charcoal); border: none; padding: 9px 18px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.87rem; font-weight: 500; cursor: pointer; }
+  .btn-s { background: var(--deep-terra); color: var(--white); border: none; padding: 9px 22px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.87rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+  .btn-s:hover { background: var(--soft-terra); }
+
+  /* confirm */
+  .cbox { background: var(--white); border-radius: 12px; padding: 28px 24px; max-width: 360px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(61,50,40,0.28); animation: su 0.2s ease; }
+  .cbox h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin-bottom: 8px; }
+  .cbox p { font-size: 0.87rem; color: #7a6a5a; margin-bottom: 22px; }
+  .cbox-btns { display: flex; gap: 9px; justify-content: center; }
+  .btn-del { background: var(--danger); color: var(--white); border: none; padding: 9px 20px; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.87rem; cursor: pointer; }
+
+  /* settings */
+  .sbox { max-width: 530px; }
+  .sinfo { background: rgba(184,92,56,0.07); border: 1px solid rgba(184,92,56,0.2); border-radius: 8px; padding: 14px 16px; margin-bottom: 18px; font-size: 0.83rem; line-height: 1.65; }
+  .sinfo a { color: var(--deep-terra); }
+  .sinfo code { background: rgba(61,50,40,0.08); padding: 1px 5px; border-radius: 4px; font-size: 0.8rem; }
+  .slabel { font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--soft-terra); margin-bottom: 8px; }
+  .mtoggle { display: flex; gap: 8px; margin-bottom: 18px; }
+  .mtbtn { flex: 1; padding: 10px; border-radius: 8px; border: 1.5px solid var(--linen); background: var(--white); font-family: 'DM Sans', sans-serif; font-size: 0.84rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+  .mtbtn.active { background: var(--charcoal); color: var(--cream); border-color: var(--charcoal); }
+  .at-fields { display: none; }
+  .at-fields.show { display: block; }
+  .hint { font-size: 0.75rem; color: #7a6a5a; margin-top: 4px; line-height: 1.5; }
+
+  /* PRINT */
+  .print-header { display: none; }
+  @media print {
+    .tab-bar, .toolbar, .action-btns, .btn-print, .btn-settings,
+    .sync-badge, .header-right > .btn-settings { display: none !important; }
+    header { position: static !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .main { padding: 0; }
+    .table-wrap { box-shadow: none; border: 1px solid #ccc; border-radius: 0; }
+    thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tbody tr { break-inside: avoid; }
+    .print-header { display: flex !important; align-items: baseline; justify-content: space-between; padding: 12px 0 14px; border-bottom: 2px solid var(--charcoal); margin-bottom: 14px; }
+    .print-header h2 { font-family: 'Playfair Display', serif; font-size: 1.1rem; }
+    .print-header p { font-size: 0.78rem; color: #7a6a5a; }
+    .client-contact { display: block !important; }
+  }
+
+  @media (max-width: 768px) {
+    .main { padding: 14px; }
+    header { padding: 12px 14px; }
+    .tab-bar { padding: 0 14px; }
+    .header-stats { gap: 12px; }
+    .grid2 { grid-template-columns: 1fr; }
+    table { font-size: 0.79rem; }
+    td, thead th { padding: 9px 9px; }
+    .client-contact { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>RFT <span>Client Tracker</span></h1>
+  <div class="header-right">
+    <div id="sync-badge" class="sync-badge sync-local"><span class="sync-dot"></span><span id="sync-txt">Local only</span></div>
+    <div class="header-stats">
+      <div class="header-stat"><span class="num" id="stat-active">0</span><span class="lbl">Active</span></div>
+      <div class="header-stat"><span class="num" id="stat-rev">$0</span><span class="lbl">Weekly Rev</span></div>
+      <div class="header-stat"><span class="num" id="stat-total">0</span><span class="lbl">Total</span></div>
+    </div>
+    <button class="btn-settings" onclick="openSettings()">⚙ Settings</button>
+  </div>
+</header>
+
+<div class="tab-bar" id="tab-bar"></div>
+
+<div class="main">
+  <div class="print-header">
+    <h2 id="ph-title">RFT Client List</h2>
+    <p id="ph-meta"></p>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-ico">🔍</span>
+      <input type="text" id="search-input" placeholder="Search by name, email or phone…">
+    </div>
+    <select class="filter-select" id="contract-filter">
+      <option value="">All Contracts</option>
+      <option value="On Contract">On Contract</option>
+      <option value="Off Contract">Off Contract</option>
+    </select>
+    <button class="btn-print" onclick="doPrint()">🖨 Print / PDF</button>
+    <button class="btn-add" onclick="openModal()">+ Add Client</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Category</th>
+          <th>Service</th>
+          <th>Weekly Price</th>
+          <th>Contract</th>
+          <th style="text-align:right">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ADD/EDIT -->
+<div class="overlay" id="ov-form">
+  <div class="mbox">
+    <div class="mhead"><h2 id="form-title">Add Client</h2><button class="mclose" onclick="closeForm()">✕</button></div>
+    <div class="mbody">
+      <div class="grid2">
+        <div class="fg full"><label>Full Name</label><input type="text" id="f-name" placeholder="e.g. Sarah Mitchell"></div>
+        <div class="fg"><label>Phone</label><input type="tel" id="f-phone" placeholder="04XX XXX XXX"></div>
+        <div class="fg"><label>Email</label><input type="email" id="f-email" placeholder="email@example.com"></div>
+        <div class="fg"><label>Category</label>
+          <select id="f-cat">
+            <option>PT Client</option><option>Small Group PT</option>
+            <option>Teen Client</option><option>Online Client</option><option>Suspended</option><option>Cancelled</option>
+          </select>
+        </div>
+        <div class="fg"><label>Service Description</label><input type="text" id="f-svc" placeholder="e.g. 3x/week strength"></div>
+        <div class="fg"><label>Weekly Price ($)</label><input type="number" id="f-price" placeholder="0" min="0" step="0.01"></div>
+        <div class="fg"><label>Contract Status</label>
+          <select id="f-con"><option>On Contract</option><option>Off Contract</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="mfoot"><button class="btn-c" onclick="closeForm()">Cancel</button><button class="btn-s" onclick="saveClient()">Save Client</button></div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="overlay" id="ov-del">
+  <div class="cbox">
+    <h3>Remove Client?</h3>
+    <p id="del-msg">This will permanently delete this client.</p>
+    <div class="cbox-btns">
+      <button class="btn-c" onclick="closeDel()">Cancel</button>
+      <button class="btn-del" onclick="doDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="overlay" id="ov-settings">
+  <div class="mbox sbox">
+    <div class="mhead"><h2>⚙ Settings</h2><button class="mclose" onclick="closeSettings()">✕</button></div>
+    <div class="mbody">
+
+      <div class="slabel">Storage Mode</div>
+      <div class="mtoggle">
+        <button class="mtbtn active" id="mb-local" onclick="pickMode('local')">💾 Local (this device)</button>
+        <button class="mtbtn" id="mb-airtable" onclick="pickMode('airtable')">☁️ Airtable (shared)</button>
+      </div>
+
+      <div class="at-fields" id="at-fields">
+        <div class="sinfo">
+          <strong>5-minute setup:</strong><br>
+          1. Create a free account at <a href="https://airtable.com" target="_blank">airtable.com</a><br>
+          2. Create a Base called <code>RFT Clients</code> and a Table called <code>Clients</code><br>
+          3. Add these fields to the table:<br>
+          &nbsp;&nbsp;<code>Name</code> · <code>Phone</code> · <code>Email</code> · <code>Category</code> (Single select) · <code>Service</code> · <code>Price</code> (Number) · <code>Contract</code> (Single select)<br>
+          4. Go to <a href="https://airtable.com/create/tokens" target="_blank">airtable.com/create/tokens</a> → create a token with <code>data.records:read</code> + <code>data.records:write</code> scopes<br>
+          5. Your Base ID is in the URL: <code>airtable.com/<strong>appXXXXXXXX</strong>/…</code>
+        </div>
+        <div class="grid2">
+          <div class="fg full">
+            <label>Personal Access Token</label>
+            <input type="password" id="s-token" placeholder="pat…">
+            <span class="hint">Saved in your browser only. Only sent to Airtable.</span>
+          </div>
+          <div class="fg full">
+            <label>Base ID</label>
+            <input type="text" id="s-base" placeholder="appXXXXXXXXXXXXXX">
+          </div>
+          <div class="fg full">
+            <label>Table Name</label>
+            <input type="text" id="s-table" value="Clients" placeholder="Clients">
+            <span class="hint">Must match the table name exactly in Airtable.</span>
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+          <button class="btn-s" style="padding:8px 16px;font-size:0.83rem" onclick="testAT()">Test Connection</button>
+          <span id="test-res" style="font-size:0.82rem;color:#7a6a5a"></span>
+        </div>
+      </div>
+
+    </div>
+    <div class="mfoot"><button class="btn-c" onclick="closeSettings()">Cancel</button><button class="btn-s" onclick="saveSettings()">Save Settings</button></div>
+  </div>
+</div>
+
+<script>
+const TABS = [
+  {key:'all',label:'All Clients'},
+  {key:'PT Client',label:'PT Clients'},
+  {key:'Small Group PT',label:'Small Group PT'},
+  {key:'Teen Client',label:'Teen Clients'},
+  {key:'Online Client',label:'Online Clients'},
+  {key:'Suspended',label:'Suspended'},
+  {key:'Cancelled',label:'Cancelled'},
+];
+const BADGE_CLS = {
+  'Member':'badge-member','PT Client':'badge-pt','Small Group PT':'badge-sgpt',
+  'Teen Client':'badge-teen','Online Client':'badge-online',
+  'Suspended':'badge-suspended','Cancelled':'badge-cancelled'
+};
+
+let _preload = [{"id": "19e66d88217b1419", "name": "Sneha Ambat", "phone": "0470 201 261", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d88217aff20d", "name": "Nancy Badaloff", "phone": "0414 834 217", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d88217dce111", "name": "Janine Bellifenine", "phone": "0408 471 730", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "102", "contract": "On Contract"}, {"id": "19e66d882171218e7", "name": "Joanna Blanco", "phone": "0408 670 338", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821791a5a7", "name": "Susannah Boothroyd", "phone": "0425 269 117", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d882172a83e0", "name": "Victoria Bray", "phone": "0423 155 719", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d88217ff68c", "name": "Simone Brown", "phone": "0413 486 414", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d88217b30724", "name": "Jeff Brown", "phone": "0407 928 544", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "102", "contract": "On Contract"}, {"id": "19e66d8821730214c", "name": "Hamish Brown", "phone": "0408 430 868", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "119", "contract": "On Contract"}, {"id": "19e66d88217635d79", "name": "Melissa Burge", "phone": "0410 338 221", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d88217da38c8", "name": "Craig Burgess", "phone": "", "email": "", "category": "Suspended", "service": "3x/week \u00b7 Small Group PT", "price": "149", "contract": "On Contract"}, {"id": "19e66d88217574f4d", "name": "Daniel Cauchi", "phone": "0423 434 843", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d882188a1420", "name": "Sanath Chandra", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821844ccbd", "name": "Henry Chow", "phone": "0405 128 667", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d8821876d90e", "name": "Rebekah Cliff", "phone": "0414 727 392", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d88218f13161", "name": "Anusha Cooray", "phone": "0410 422 980", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d8821875c67a", "name": "Sriyan Cooray", "phone": "0414 655 506", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Small Group PT", "price": "149", "contract": "On Contract"}, {"id": "19e66d882189fd001", "name": "Belinda Cox", "phone": "0418 238 156", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "96", "contract": "On Contract"}, {"id": "19e66d88218adf3e", "name": "Stevie Crouch", "phone": "0411 299 968", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d882184b59d6", "name": "Louise Dalton", "phone": "0450 979 021", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "102", "contract": "On Contract"}, {"id": "19e66d882186c0882", "name": "Andrew Dean", "phone": "0417 420 644", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "108", "contract": "On Contract"}, {"id": "19e66d88218d99c40", "name": "Stephanie Doak", "phone": "0418 275 541", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "108", "contract": "On Contract"}, {"id": "19e66d882184947d5", "name": "Vikham Dogra", "phone": "0481 365 501", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d88218166732", "name": "Cathy Gair", "phone": "0403 537 022", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "92", "contract": "On Contract"}, {"id": "19e66d882188c5d2b", "name": "William Garton", "phone": "0419 376 853", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Small Group PT", "price": "149", "contract": "On Contract"}, {"id": "19e66d88218c6c434", "name": "Maree Gibson", "phone": "0409 555 246", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "108", "contract": "On Contract"}, {"id": "19e66d8821811805d", "name": "David Gremmo", "phone": "0419 143 617", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "108", "contract": "On Contract"}, {"id": "19e66d882181b2a47", "name": "Pramesh Gunasekara", "phone": "0431 615 544", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d882182da480", "name": "Simon Gwynne", "phone": "0416 073 303", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "103", "contract": "On Contract"}, {"id": "19e66d8821910ec8b", "name": "Catherine Hadaj", "phone": "0404 078 056", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d882197f2b85", "name": "Stewart Harrington", "phone": "0415 630 236", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d88219d68636", "name": "Kylie Isherwood", "phone": "0414 650 466", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "108", "contract": "On Contract"}, {"id": "19e66d882193dae6f", "name": "Lachlan Isherwood", "phone": "0437 817 936", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d8821928f57b", "name": "Amelia Jabbour", "phone": "0414 251 117", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d88219f2deba", "name": "Maryanne Jacobs", "phone": "0449 700 028", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d88219b871f4", "name": "Suellen Jansen", "phone": "0412 858 368", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d88219956d42", "name": "Tony Jeffcott", "phone": "0417 211 748", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "108", "contract": "On Contract"}, {"id": "19e66d882192671c7", "name": "Ben Jobberns", "phone": "0402 444 171", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821911829c", "name": "Gina Jonesy", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821916bbaf", "name": "Ruhan Kalal", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821910a43e", "name": "Jenny Kaslik", "phone": "0414 460 072", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "103", "contract": "On Contract"}, {"id": "19e66d88219199bd4", "name": "Ross Knight", "phone": "0407 504 499", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d88219916a19", "name": "Robert Konstantopoulos", "phone": "0426 817 020", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821a8bd032", "name": "Nandhini Kumar", "phone": "0422 365 360", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "119", "contract": "On Contract"}, {"id": "19e66d8821a5035bb", "name": "Carien Labuschagne", "phone": "0421 156 948", "email": "", "category": "Suspended", "service": "", "price": "", "contract": "On Contract"}, {"id": "19e66d8821a37c9e5", "name": "Fransisca Laiyadi", "phone": "0422 091 017", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d8821a103ec8", "name": "Pamala Land", "phone": "0416 255 455", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821a6cf94d", "name": "Joel Leamore", "phone": "0434 932 176", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821ab809a2", "name": "Justin Leany", "phone": "0410 515 616", "email": "", "category": "Suspended", "service": "", "price": "", "contract": "On Contract"}, {"id": "19e66d8821a52e255", "name": "Silvana Liddle", "phone": "0410 660 989", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "103", "contract": "On Contract"}, {"id": "19e66d8821af55d0f", "name": "Tanya Lupica", "phone": "0432 278 876", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "102", "contract": "On Contract"}, {"id": "19e66d8821a462b81", "name": "Saurabh Malhorta", "phone": "0413 278 424", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821a4453ea", "name": "Raewa Mcewen", "phone": "0425 336 073", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "137.5", "contract": "On Contract"}, {"id": "19e66d8821afd5096", "name": "Kelly Mcpherson", "phone": "0408 150 333", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Small Group PT", "price": "149", "contract": "On Contract"}, {"id": "19e66d8821ac2af88", "name": "Majella Miller", "phone": "0420 968 020", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "102", "contract": "On Contract"}, {"id": "19e66d8821a99d212", "name": "James Millington", "phone": "0419 145 649", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "108", "contract": "On Contract"}, {"id": "19e66d8821a159ed9", "name": "Babar Mirza", "phone": "0401 672 800", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821ac1a4a5", "name": "Sara Mirza", "phone": "0401 671 424", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821ad2b3d7", "name": "Cliff Mullee", "phone": "0430 055 186", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "108", "contract": "On Contract"}, {"id": "19e66d8821bd254ae", "name": "Raman Mullee", "phone": "0431 336 233", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "108", "contract": "On Contract"}, {"id": "19e66d8821be8718a", "name": "Carla Napolitano", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821b4c16e2", "name": "Lino Napolitano", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821bc44978", "name": "Adriana Nascimento", "phone": "0424 722 670", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d8821b6cfd9e", "name": "Geneive Ormsby", "phone": "0466 210 938", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d8821bb77f88", "name": "Priscilla Osborne", "phone": "0416 365 595", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821bb811bf", "name": "Jeff Parish", "phone": "0414 282 883", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "102", "contract": "On Contract"}, {"id": "19e66d8821b12cbe5", "name": "Jessica Parker", "phone": "0421 633 241", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d8821b83f266", "name": "Brett Parker", "phone": "0421 050 671", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821be7b5c6", "name": "Clare Parker", "phone": "0412 717 041", "email": "", "category": "Suspended", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821bd9cd5f", "name": "Laura Penry", "phone": "0404 637 175", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Small Group PT", "price": "149", "contract": "On Contract"}, {"id": "19e66d8821b7928c7", "name": "Daniel Pettman", "phone": "0433 833 549", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821b41a9a2", "name": "Harjith Prabhakaran", "phone": "0434 405 299", "email": "", "category": "Suspended", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821b2c925c", "name": "Russell Quinlan", "phone": "0409 595 639", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "108", "contract": "On Contract"}, {"id": "19e66d8821b421ada", "name": "David Rivetts", "phone": "0447 391 892", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "108", "contract": "On Contract"}, {"id": "19e66d8821b4be20d", "name": "Glen Rowe", "phone": "0414 690 124", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "119", "contract": "On Contract"}, {"id": "19e66d8821cf875b6", "name": "Joanne Rowe", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821cfd342e", "name": "Sharne Rubera", "phone": "0414 468 411", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821c91a048", "name": "Roseanne Schembri", "phone": "0418 295 283", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d8821c598e81", "name": "Cecilia Sebastin", "phone": "0430 354 549", "email": "", "category": "Suspended", "service": "", "price": "", "contract": "On Contract"}, {"id": "19e66d8821c579931", "name": "Dakshitta Senaratn", "phone": "0431 902 611", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "113", "contract": "On Contract"}, {"id": "19e66d8821cd7ffa3", "name": "Amarjeet Singh", "phone": "0403 484 111", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821c9c50d8", "name": "Myriam Sivalingam", "phone": "0421 178 476", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821cbd19b6", "name": "Sharon Smith", "phone": "0407 437 741", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Small Group PT", "price": "128.5", "contract": "On Contract"}, {"id": "19e66d8821cb83f67", "name": "Luke Srandovic", "phone": "0412 179 342", "email": "", "category": "Small Group PT", "service": "1x/week \u00b7 Small Group PT", "price": "55", "contract": "On Contract"}, {"id": "19e66d8821cbd559b", "name": "Nicole Stalley", "phone": "0412 540 457", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821c10312a", "name": "Tiarna Stalley", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821cb3e05a", "name": "Margaret Starkley", "phone": "0416 109 766", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "93", "contract": "On Contract"}, {"id": "19e66d8821cd1281a", "name": "Katrina Stephson", "phone": "0413 805 786", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821cbfe27b", "name": "Nick Trimble", "phone": "0468 895 898", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "105", "contract": "On Contract"}, {"id": "19e66d8821c470fc5", "name": "Stella Tsagaris", "phone": "0415 741 372", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821c288cad", "name": "Paul Turner", "phone": "0400 665 552", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Small Group PT", "price": "137.5", "contract": "On Contract"}, {"id": "19e66d8821df6b653", "name": "Yavuz Uydu", "phone": "0414 693 493", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821d3cb21f", "name": "Josh Van Gestel", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821dd06217", "name": "Tashlyn Van Gestel", "phone": "0410 663 263", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821d129347", "name": "Owen Vavsour", "phone": "0403 833 676", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821d1db1da", "name": "Igor Vidic", "phone": "0410 685 713", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "102", "contract": "On Contract"}, {"id": "19e66d8821d16f598", "name": "Danielle Watson", "phone": "0425 834 621", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821d131c4a", "name": "Traci Watt", "phone": "0433 833 549", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821da59dfe", "name": "Samantha Wenaden", "phone": "0405 901 970", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821d9a44ad", "name": "Steve Wickman", "phone": "0421 336 761", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821d628ef4", "name": "Thersea Wickman", "phone": "0421 336 761", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821db64077", "name": "Amanda Wong", "phone": "0433 015 505", "email": "", "category": "Suspended", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821dceaf85", "name": "Troy Wurth", "phone": "0403 417 290", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821d5aebdb", "name": "Emma Power", "phone": "0425 212 882", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821d8552da", "name": "Sophie Mumsumeci", "phone": "0405 411 746", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821df4250e", "name": "Michelle Whalen", "phone": "0438 229 744", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821dfc57c7", "name": "Reyan Wijenarayana", "phone": "0425 750 569", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821d90357b", "name": "Kerry Kumm", "phone": "0450 856 697", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821e37988b", "name": "Justin Mcfarland", "phone": "0433 661 307", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821e888661", "name": "Ashwin Venkataraman", "phone": "0410 603 412", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821e94b3b", "name": "Fiona Moran", "phone": "0434 667 481", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821e667b0f", "name": "Jon Moran", "phone": "0410 746 822", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821e4d2077", "name": "Tracey Flynn", "phone": "0404 512 860", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821ed5b995", "name": "Asra Khan", "phone": "0416 261 361", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821ed0b6df", "name": "Michelle Robinson", "phone": "0421 408 356", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821e39bec2", "name": "Annette Lewis", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821e9dd8fb", "name": "Sienna Moran", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821e12f069", "name": "Amanda Gregoriou", "phone": "0435 793 042", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821eb2a04a", "name": "Alex Maguire", "phone": "0423 298 557", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821e6b8a7f", "name": "Maddie Moran", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821ec5914b", "name": "Ante Bruning", "phone": "0466 611 234", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821e3ea416", "name": "Nandheni Rajarathinam", "phone": "0426 767 782", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821ec6e8b6", "name": "Raja Vellaichamy", "phone": "0424 090 886", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821eb2a16a", "name": "Rachel Gatumia", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821e6f3f8f", "name": "Keyurita Mane", "phone": "0426 857 631", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821f6ed96f", "name": "Mahendra Mane", "phone": "0406 446 786", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821f9ce58f", "name": "Amanda Krklinski", "phone": "0401 741 364", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821f8bd5b2", "name": "Nicole Black", "phone": "0413 464 172", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821f4b405c", "name": "Amelia Cox", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821f506142", "name": "Lachlan Doak", "phone": "", "email": "", "category": "Small Group PT", "service": "1x/week \u00b7 Small Group PT", "price": "54.5", "contract": "On Contract"}, {"id": "19e66d8821fd456a7", "name": "Sahil Mahajan", "phone": "", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821f7d14d3", "name": "Ashwini Ranade", "phone": "0481 733 932", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Small Group PT", "price": "109", "contract": "On Contract"}, {"id": "19e66d8821fc3bff3", "name": "Nick Aifantis", "phone": "0418 211 579", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Hybrid SGPT", "price": "124", "contract": "On Contract"}, {"id": "19e66d8821fa9568f", "name": "Warrick Anderson", "phone": "0414 587 200", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Hybrid SGPT", "price": "185", "contract": "On Contract"}, {"id": "19e66d8821f376de3", "name": "Boo Clark", "phone": "0410 540 246", "email": "", "category": "Small Group PT", "service": "2x/week \u00b7 Hybrid SGPT", "price": "130", "contract": "On Contract"}, {"id": "19e66d8821fd1ef99", "name": "Fiona Dixon", "phone": "0401 208 709", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Hybrid SGPT", "price": "179", "contract": "On Contract"}, {"id": "19e66d8821f2cffce", "name": "Michelle Moat", "phone": "0438 248 766", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Hybrid SGPT", "price": "179", "contract": "On Contract"}, {"id": "19e66d8821f55034a", "name": "Stewart Moat", "phone": "0425 229 945", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Hybrid SGPT", "price": "179", "contract": "On Contract"}, {"id": "19e66d8821f3b340d", "name": "Karen Norman", "phone": "0459 290 585", "email": "", "category": "Small Group PT", "service": "4x/week \u00b7 Hybrid SGPT", "price": "200", "contract": "On Contract"}, {"id": "19e66d8822074b0e5", "name": "Nat Richie", "phone": "0405 784 842", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Hybrid SGPT", "price": "179", "contract": "On Contract"}, {"id": "19e66d882201af729", "name": "Fereshteh Sarkheil", "phone": "", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Hybrid SGPT", "price": "179", "contract": "On Contract"}, {"id": "19e66d88220c9960c", "name": "Rashids Sarkheil", "phone": "0455 241 676", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Hybrid SGPT", "price": "179", "contract": "On Contract"}, {"id": "19e66d8822014331e", "name": "Karen Tebbet", "phone": "0422 366 526", "email": "", "category": "Small Group PT", "service": "3x/week \u00b7 Hybrid SGPT", "price": "179", "contract": "On Contract"}, {"id": "19e66d8822072a04a", "name": "Tess Turner", "phone": "0412 217 546", "email": "", "category": "Small Group PT", "service": "4x/week \u00b7 Hybrid SGPT", "price": "267", "contract": "On Contract"}, {"id": "19e66d88220aba3ff", "name": "Camille Abbot", "phone": "", "email": "", "category": "PT Client", "service": "3x/week \u00b7 PT", "price": "240", "contract": "On Contract"}, {"id": "19e66d88220b68418", "name": "Melissa Abela", "phone": "0417 418 744", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "82", "contract": "On Contract"}, {"id": "19e66d882208e9308", "name": "Kerry Allen", "phone": "0414 228 390", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d88220ae78b2", "name": "Anuju Ambat", "phone": "0402 119 353", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d8822052badd", "name": "Mark Beaton", "phone": "0416 352 720", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88220a90ad9", "name": "Carly Bibnill", "phone": "0404 024 009", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d88220b1f6b0", "name": "Anu Bullar", "phone": "0433 132 853", "email": "", "category": "Suspended", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d88220558273", "name": "Jeff Cronan", "phone": "0419 236 665", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "84.5", "contract": "On Contract"}, {"id": "19e66d882209224a", "name": "Karen Cronan", "phone": "", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d8822093abf8", "name": "Rushanth David", "phone": "0411 065 267", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d8822112e71", "name": "Tess Desanto", "phone": "0417 239 966", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "141", "contract": "On Contract"}, {"id": "19e66d88221b6842", "name": "Amandeep Dhanju", "phone": "0430 456 145", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "82", "contract": "On Contract"}, {"id": "19e66d88221ff2f31", "name": "Jas Dhanju", "phone": "0438 482 233", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "82", "contract": "On Contract"}, {"id": "19e66d88221a3f59d", "name": "Andrew Drummond", "phone": "0418 116 994", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "151", "contract": "On Contract"}, {"id": "19e66d88221fb4b79", "name": "Kendy Drummond", "phone": "0404 866 030", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "151", "contract": "On Contract"}, {"id": "19e66d882214d1571", "name": "Mitchell George", "phone": "", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d8822121f339", "name": "Mark Hammond", "phone": "0417 375 898", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "82", "contract": "On Contract"}, {"id": "19e66d882217fa5bf", "name": "Michael Harvey", "phone": "", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "164", "contract": "On Contract"}, {"id": "19e66d88221340356", "name": "Denise Harvey", "phone": "", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88221da82f7", "name": "Wayne Howarth", "phone": "0412 145 891", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "82", "contract": "On Contract"}, {"id": "19e66d882214ced79", "name": "Keiryn Ingram", "phone": "0414 763 607", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d88221395d29", "name": "Barsha Karki", "phone": "0404 372 864", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "82", "contract": "On Contract"}, {"id": "19e66d88221f15d30", "name": "Steve Kerfoot", "phone": "0419 033 023", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "180", "contract": "On Contract"}, {"id": "19e66d88221920784", "name": "Ben Leatherland", "phone": "0414 098 858", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d882217d9009", "name": "Erin Lee", "phone": "0404 111 525", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88221b24faa", "name": "Eddie Lucas", "phone": "0411 078 394", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88221acf8f8", "name": "Jenny Mattner", "phone": "0403 758 855", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "159", "contract": "On Contract"}, {"id": "19e66d88222a49dee", "name": "Dale Mcdermid", "phone": "0408 275 880", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "", "contract": "On Contract"}, {"id": "19e66d882224a0357", "name": "Nigel Mcewen", "phone": "0425 336 073", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "164", "contract": "On Contract"}, {"id": "19e66d88222230655", "name": "Bronwyn Mitchell", "phone": "0419 985 769", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "81.5", "contract": "On Contract"}, {"id": "19e66d882223d8790", "name": "Lachlan Moat", "phone": "", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d882226ec796", "name": "Zohreh Mokarian", "phone": "0413 485 811", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d88222293bd6", "name": "Clara Murace", "phone": "0414 488 086", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d8822277da7f", "name": "Syd Nair", "phone": "0422 687 908", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "84.5", "contract": "On Contract"}, {"id": "19e66d88222eb33e3", "name": "Hich Nasr", "phone": "0400 213 104", "email": "", "category": "PT Client", "service": "3x/week \u00b7 PT", "price": "220", "contract": "On Contract"}, {"id": "19e66d88222b35925", "name": "Melissa O'hagan", "phone": "", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d882229b0902", "name": "Liam Ohgan", "phone": "", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "164", "contract": "On Contract"}, {"id": "19e66d88222329077", "name": "Dominique Prasad", "phone": "", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d88222b2f18a", "name": "Jenny Prasad", "phone": "0423 053 602", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d8822281ef43", "name": "Rachel Primrose", "phone": "0402 056 653", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d882222a7725", "name": "Ben Radcliffe", "phone": "0428 513 952", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88222f2d216", "name": "Roslyn Robertson", "phone": "0408 226 285", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "84.5", "contract": "On Contract"}, {"id": "19e66d8822210691a", "name": "Nick Slawski", "phone": "0407 484 808", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "164", "contract": "On Contract"}, {"id": "19e66d882239359fa", "name": "Karen Smith", "phone": "0424 178 544", "email": "", "category": "PT Client", "service": "4x/week \u00b7 PT", "price": "72.5", "contract": "On Contract"}, {"id": "19e66d8822313c98c", "name": "Ryan Steyn", "phone": "0415 948 092", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d882232b7429", "name": "Andrea Struewers", "phone": "0427 434 717", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "73", "contract": "On Contract"}, {"id": "19e66d88223995286", "name": "Julia Styen", "phone": "0427 992 992", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88223d4fc5e", "name": "Jacqui Trenwenack", "phone": "0412 174 945", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d88223d3b2c9", "name": "Theresa Troup", "phone": "0433 150 898", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d88224c87226", "name": "Katherine Vassallo", "phone": "0409 622 226", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d8822469c931", "name": "Brent Wharton", "phone": "0410 633 601", "email": "", "category": "Suspended", "service": "", "price": "", "contract": "On Contract"}, {"id": "19e66d88225309e2d", "name": "Mark Wharton", "phone": "0416 133 729", "email": "", "category": "PT Client", "service": "3x/week \u00b7 PT", "price": "281", "contract": "On Contract"}, {"id": "19e66d882256f91a7", "name": "Sara Willard", "phone": "0413 129 795", "email": "", "category": "PT Client", "service": "3x/week \u00b7 PT", "price": "225", "contract": "On Contract"}, {"id": "19e66d882259112e6", "name": "Catriona Wood", "phone": "0410 504 470", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d88225f007c8", "name": "Kate Wurth", "phone": "0402 537 668", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "164", "contract": "On Contract"}, {"id": "19e66d88225dc0b58", "name": "Abigail Zaballero", "phone": "", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d88225442598", "name": "Michelle Whalen", "phone": "0438 229 744", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d88225220751", "name": "Cassie Pace", "phone": "0400 436 182", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d8822545256b", "name": "Stephen Boothroyd", "phone": "", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d882256293fb", "name": "Jade Bellifenine", "phone": "", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d88225a2d4da", "name": "Sam Russo", "phone": "", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d8822516540f", "name": "Aarna Agarwal", "phone": "0433 869 612", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d8822528dfd5", "name": "Kevin Chen", "phone": "0402 714 518", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d88225ab9019", "name": "Ryan Attard", "phone": "0435 904 006", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d882253fb0b7", "name": "Christine Pallin", "phone": "0417 441 492", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88225ffe5d7", "name": "Lee Demaniel", "phone": "0407 123 524", "email": "", "category": "PT Client", "service": "3x/week \u00b7 PT", "price": "240", "contract": "On Contract"}, {"id": "19e66d88225df6ed4", "name": "Lisa Pollicia", "phone": "", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d8822577c38", "name": "Vanessa Talty", "phone": "", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88226375856", "name": "Mike Cowan", "phone": "", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88226d980b0", "name": "Dylan Redding", "phone": "", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d88226302643", "name": "Thyler Kendyl", "phone": "", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d88226313c6d", "name": "Corey Millichamp", "phone": "0459 351 116", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88226c931dd", "name": "Nitin Arora", "phone": "0452 361 430", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d8822672ea40", "name": "Adele Coiro", "phone": "0420 306 049", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88226174b3d", "name": "Soniya Marwah", "phone": "0431 791 899", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "85", "contract": "On Contract"}, {"id": "19e66d88226d71555", "name": "Zhengchuan Luo", "phone": "0449 209 688", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d882268e0279", "name": "Hina Patel", "phone": "", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d882261ec498", "name": "Swaroopa Hayes", "phone": "0434 666 005", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}, {"id": "19e66d882268da828", "name": "Susan Harvey", "phone": "0407 242 505", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d88226c87e90", "name": "Rivinder Singh", "phone": "0423 886 296", "email": "", "category": "PT Client", "service": "2x/week \u00b7 PT", "price": "160", "contract": "On Contract"}, {"id": "19e66d882264300e0", "name": "Penny Costis", "phone": "0401 032 522", "email": "", "category": "PT Client", "service": "3x/week \u00b7 PT", "price": "240", "contract": "On Contract"}, {"id": "19e66d882269f7997", "name": "Anuraag Agarwal", "phone": "0416 970 833", "email": "", "category": "PT Client", "service": "1x/week \u00b7 PT", "price": "80", "contract": "On Contract"}];
+let clients    = (function(){
+  try {
+    const stored = JSON.parse(localStorage.getItem('rft_clients')||'null');
+    // If stored data exists and has records, use it; otherwise use preloaded CSV data
+    if(stored && stored.length > 0) return stored;
+  } catch(e) {}
+  return _preload;
+})();
+let activeTab  = 'all';
+let editId     = null;
+let delId      = null;
+let mode       = localStorage.getItem('rft_mode')||'local';
+let atToken    = localStorage.getItem('rft_at_token')||'';
+let atBase     = localStorage.getItem('rft_at_base')||'';
+let atTable    = localStorage.getItem('rft_at_table')||'Clients';
+
+function lsave(){ localStorage.setItem('rft_clients',JSON.stringify(clients)); }
+function gid()  { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+
+/* ── SYNC STATUS ── */
+function setSync(type,txt){
+  const el=document.getElementById('sync-badge');
+  const tx=document.getElementById('sync-txt');
+  el.className='sync-badge sync-'+type;
+  const ico = type==='busy'
+    ? '<span class="spin-icon">↻</span>'
+    : '<span class="sync-dot"></span>';
+  el.innerHTML=ico+'<span>'+txt+'</span>';
+}
+
+/* ── AIRTABLE ── */
+function atH(){ return {'Authorization':'Bearer '+atToken,'Content-Type':'application/json'}; }
+function atU(x=''){ return `https://api.airtable.com/v0/${atBase}/${encodeURIComponent(atTable)}${x}`; }
+function atF(c){ return {Name:c.name,Phone:c.phone,Email:c.email,Category:c.category,Service:c.service,Price:parseFloat(c.price)||0,Contract:c.contract}; }
+function atR(r){ const f=r.fields; return {id:r.id,name:f.Name||'',phone:f.Phone||'',email:f.Email||'',category:f.Category||'Member',service:f.Service||'',price:f.Price||0,contract:f.Contract||'Off Contract'}; }
+
+async function atLoad(){
+  setSync('busy','Syncing…');
+  let all=[],offset='';
+  try {
+    do {
+      const res=await fetch(atU('?pageSize=100'+(offset?'&offset='+offset:'')),{headers:atH()});
+      if(!res.ok) throw new Error(await res.text());
+      const d=await res.json();
+      all=all.concat(d.records||[]);
+      offset=d.offset||'';
+    } while(offset);
+    clients=all.map(atR); lsave();
+    setSync('ok','Airtable synced'); renderAll();
+  } catch(e){ setSync('err','Sync failed'); console.error(e); }
+}
+
+async function atCreate(c){
+  setSync('busy','Saving…');
+  try {
+    const res=await fetch(atU(),{method:'POST',headers:atH(),body:JSON.stringify({fields:atF(c)})});
+    if(!res.ok) throw new Error(await res.text());
+    const d=await res.json(); c.id=d.id;
+    setSync('ok','Airtable synced');
+  } catch(e){ setSync('err','Save failed'); console.error(e); }
+}
+
+async function atPatch(c){
+  setSync('busy','Saving…');
+  try {
+    const res=await fetch(atU('/'+c.id),{method:'PATCH',headers:atH(),body:JSON.stringify({fields:atF(c)})});
+    if(!res.ok) throw new Error(await res.text());
+    setSync('ok','Airtable synced');
+  } catch(e){ setSync('err','Save failed'); console.error(e); }
+}
+
+async function atDel(id){
+  setSync('busy','Deleting…');
+  try {
+    const res=await fetch(atU('/'+id),{method:'DELETE',headers:atH()});
+    if(!res.ok) throw new Error(await res.text());
+    setSync('ok','Airtable synced');
+  } catch(e){ setSync('err','Delete failed'); console.error(e); }
+}
+
+/* ── RENDER ── */
+function renderTabs(){
+  const bar=document.getElementById('tab-bar'); bar.innerHTML='';
+  TABS.forEach(t=>{
+    const n=t.key==='all'?clients.length:clients.filter(c=>c.category===t.key).length;
+    const b=document.createElement('button');
+    b.className='tab-btn'+(activeTab===t.key?' active':'');
+    b.innerHTML=`${t.label} <span class="tab-badge">${n}</span>`;
+    b.onclick=()=>{activeTab=t.key;renderAll();};
+    bar.appendChild(b);
+  });
+}
+
+function renderTable(){
+  const q=document.getElementById('search-input').value.toLowerCase();
+  const cf=document.getElementById('contract-filter').value;
+  const list=clients.filter(c=>{
+    const t=activeTab==='all'||c.category===activeTab;
+    const s=!q||[c.name,c.email,c.phone].some(v=>(v||'').toLowerCase().includes(q));
+    const k=!cf||c.contract===cf;
+    return t&&s&&k;
+  });
+  const tb=document.getElementById('tbody');
+  if(!list.length){
+    tb.innerHTML=`<tr><td colspan="6"><div class="empty-state"><div style="font-size:2rem">📋</div><p>No clients found.</p></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML=list.map(c=>`
+  <tr${c.category==='Suspended'?' class="row-suspended"':''}>
+    <td><div class="client-name">${x(c.name)}</div><div class="client-contact">${x(c.phone)} · ${x(c.email)}</div></td>
+    <td><span class="badge ${BADGE_CLS[c.category]||''}">${x(c.category)}</span></td>
+    <td style="font-size:0.82rem;color:#7a6a5a">${x(c.service||'—')}</td>
+    <td class="price-cell">${c.price?'$'+parseFloat(c.price).toFixed(2):'—'}</td>
+    <td><span class="cpill ${c.contract==='On Contract'?'con-on':'con-off'}">${c.contract==='On Contract'?'✓':'✗'} ${x(c.contract)}</span></td>
+    <td><div class="action-btns">
+      <button class="btn-e" onclick="openModal('${c.id}')">Edit</button>
+      <button class="btn-d" onclick="openDel('${c.id}')">Delete</button>
+    </div></td>
+  </tr>`).join('');
+}
+
+function renderStats(){
+  const act=clients.filter(c=>c.category!=='Suspended'&&c.category!=='Cancelled');
+  const rev=act.reduce((s,c)=>s+(parseFloat(c.price)||0),0);
+  document.getElementById('stat-active').textContent=act.length;
+  document.getElementById('stat-rev').textContent='$'+rev.toFixed(0);
+  document.getElementById('stat-total').textContent=clients.length;
+}
+
+function renderAll(){ renderTabs(); renderTable(); renderStats(); }
+
+/* ── ADD/EDIT ── */
+function openModal(id=null){
+  editId=id;
+  document.getElementById('form-title').textContent=id?'Edit Client':'Add Client';
+  if(id){
+    const c=clients.find(v=>v.id===id);
+    if(c){
+      document.getElementById('f-name').value=c.name||'';
+      document.getElementById('f-phone').value=c.phone||'';
+      document.getElementById('f-email').value=c.email||'';
+      document.getElementById('f-cat').value=c.category;
+      document.getElementById('f-svc').value=c.service||'';
+      document.getElementById('f-price').value=c.price||'';
+      document.getElementById('f-con').value=c.contract;
+    }
+  } else {
+    ['f-name','f-phone','f-email','f-svc','f-price'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('f-cat').value='Member';
+    document.getElementById('f-con').value='On Contract';
+  }
+  document.getElementById('ov-form').classList.add('open');
+}
+function closeForm(){ document.getElementById('ov-form').classList.remove('open'); editId=null; }
+
+async function saveClient(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){alert('Please enter a client name.');return;}
+  const data={name,phone:document.getElementById('f-phone').value.trim(),email:document.getElementById('f-email').value.trim(),category:document.getElementById('f-cat').value,service:document.getElementById('f-svc').value.trim(),price:document.getElementById('f-price').value,contract:document.getElementById('f-con').value};
+  closeForm();
+  if(editId){
+    const i=clients.findIndex(c=>c.id===editId);
+    if(i!==-1){ clients[i]={...clients[i],...data}; lsave(); if(mode==='airtable') await atPatch(clients[i]); }
+  } else {
+    const c={id:gid(),...data}; clients.push(c); lsave();
+    if(mode==='airtable') await atCreate(c);
+  }
+  renderAll();
+}
+
+/* ── DELETE ── */
+function openDel(id){
+  delId=id;
+  const c=clients.find(v=>v.id===id);
+  document.getElementById('del-msg').textContent=`This will permanently delete ${c?c.name:'this client'}.`;
+  document.getElementById('ov-del').classList.add('open');
+}
+function closeDel(){ document.getElementById('ov-del').classList.remove('open'); delId=null; }
+async function doDelete(){
+  if(!delId)return;
+  const id=delId; closeDel();
+  if(mode==='airtable') await atDel(id);
+  clients=clients.filter(c=>c.id!==id); lsave(); renderAll();
+}
+
+/* ── SETTINGS ── */
+function openSettings(){
+  document.getElementById('s-token').value=atToken;
+  document.getElementById('s-base').value=atBase;
+  document.getElementById('s-table').value=atTable;
+  pickMode(mode,false);
+  document.getElementById('ov-settings').classList.add('open');
+}
+function closeSettings(){ document.getElementById('ov-settings').classList.remove('open'); }
+
+function pickMode(m,save=true){
+  mode=m;
+  document.getElementById('mb-local').classList.toggle('active',m==='local');
+  document.getElementById('mb-airtable').classList.toggle('active',m==='airtable');
+  document.getElementById('at-fields').classList.toggle('show',m==='airtable');
+}
+
+async function testAT(){
+  const tok=document.getElementById('s-token').value.trim();
+  const base=document.getElementById('s-base').value.trim();
+  const tbl=document.getElementById('s-table').value.trim()||'Clients';
+  const el=document.getElementById('test-res');
+  el.textContent='⏳ Testing…'; el.style.color='';
+  try {
+    const res=await fetch(`https://api.airtable.com/v0/${base}/${encodeURIComponent(tbl)}?maxRecords=1`,{headers:{'Authorization':'Bearer '+tok}});
+    if(res.ok){ el.textContent='✅ Connected!'; el.style.color='#2e7d52'; }
+    else { const d=await res.json(); el.textContent='❌ '+(d.error?.message||'Failed'); el.style.color='#c0392b'; }
+  } catch(e){ el.textContent='❌ Network error'; el.style.color='#c0392b'; }
+}
+
+function saveSettings(){
+  atToken=document.getElementById('s-token').value.trim();
+  atBase=document.getElementById('s-base').value.trim();
+  atTable=document.getElementById('s-table').value.trim()||'Clients';
+  localStorage.setItem('rft_mode',mode);
+  localStorage.setItem('rft_at_token',atToken);
+  localStorage.setItem('rft_at_base',atBase);
+  localStorage.setItem('rft_at_table',atTable);
+  closeSettings();
+  if(mode==='airtable'&&atToken&&atBase){ atLoad(); }
+  else { setSync('local','Local only'); renderAll(); }
+}
+
+/* ── PRINT ── */
+function doPrint(){
+  const tab=TABS.find(t=>t.key===activeTab)?.label||'All Clients';
+  const cf=document.getElementById('contract-filter').value;
+  const count=document.querySelectorAll('#tbody tr:not(.empty-row)').length;
+  const dt=new Date().toLocaleDateString('en-AU',{day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById('ph-title').textContent='RFT Client List — '+tab;
+  document.getElementById('ph-meta').textContent='Printed: '+dt+(cf?' · '+cf:'')+' · '+clients.filter(c=>{
+    return (activeTab==='all'||c.category===activeTab)&&(!cf||c.contract===cf);
+  }).length+' clients';
+  window.print();
+}
+
+/* ── HELPERS ── */
+function x(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+['ov-form','ov-del','ov-settings'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('open'); });
+});
+document.getElementById('search-input').addEventListener('input',renderTable);
+document.getElementById('contract-filter').addEventListener('change',renderTable);
+
+/* ── INIT ── */
+if(mode==='airtable'&&atToken&&atBase){ atLoad(); }
+else { setSync('local','Local only'); renderAll(); }
+</script>
+</body>
+</html>
